@@ -1,0 +1,601 @@
+---
+title: "Project2_Data_Preparation:Commuter Statistics and Covid
+author: "Jason Brown"
+date: "2023-11-07"
+output: html_document
+---
+
+## Project 2 Data Preparation Commuter Statistics and Covid
+
+#### Install and implement libraries
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+pkgs <- sort(c('tidyverse', 'factoextra', 'dbscan', 'cluster', 'mclust', 
+  'kernlab', 'e1071', 'scatterpie', 'fpc', 'seriation', 'mlbench', 'GGally'
+))
+  
+pkgs_install <- pkgs[!(pkgs %in% installed.packages()[,"Package"])]
+if(length(pkgs_install)) install.packages(pkgs_install)
+```
+
+
+```{r}
+pkgs <- sort(c('tidyverse', 'GGally', 'ggcorrplot', 
+    'plotly', 'factoextra', 'arules', 'seriation', 
+    'sampling', 'caret', 'proxy'))
+
+pkgs_install <- pkgs[!(pkgs %in% installed.packages()[,"Package"])]
+if(length(pkgs_install)) install.packages(pkgs_install)
+```
+
+
+
+
+
+```{r}
+
+library(tidyverse)
+library("factoextra")
+library(tidyr)
+```
+
+
+
+## Import Data
+
+
+```{r}
+selected_cases <- read.csv("selected_features.csv", sep = "")
+summary(selected_cases)
+```
+
+#### Normalize Data
+
+
+```{r}
+selected_cases <- selected_cases %>% mutate_if(is.character, factor)
+dim(selected_cases)
+```
+
+
+```{r}
+cases_tibble <- read_csv("Selected_features_tibble.csv")
+cases_tibble
+```
+
+#### Review Selected Features
+
+```{r}
+summary(selected_cases)
+```
+
+#### List Selected Features
+
+
+```{r}
+colnames = names(selected_cases)
+colnames_sorted <- sort(colnames)
+
+for (i in colnames_sorted)
+  print(i)
+  features <- i
+
+for ( i in features)
+  print(i)
+```
+#### Create subsets 
+
+```{r}
+audit_cases <- selected_cases %>% mutate(white_pop_per_1000 = white_pop/total_pop*1000, black_pop_per_1000 = black_pop/total_pop*1000, hispanic_pop_per_1000 = hispanic_pop/total_pop*1000, asian_pop_per_1000 = asian_pop/total_pop*1000, amerindian_pop_per_1000 = amerindian_pop/total_pop*1000, children_per_1000 = children/total_pop*1000, amerindian_pop_per_1000 = amerindian_pop/total_pop*1000, poverty_per_1000 = poverty/total_pop * 1000, local_commuters_per_1000 = local_commuters/total_pop*1000, commuters_in_groups_per_1000 = commuters_in_groups/total_pop*1000, out_of_town_commuters_per_1000 = out_of_town_commuters/total_pop*1000, two_parent_families_with_young_children_per_1000 = two_parent_families_with_young_children/total_pop*1000, unemployed_pop_per_1000 = unemployed_pop/total_pop*1000, some_college_and_associates_degree_per_1000 = some_college_and_associates_degree/total_pop*1000, pop_determined_poverty_status_per_1000 = pop_determined_poverty_status/total_pop*1000, not_us_citizen_pop_per_1000 = not_us_citizen_pop/total_pop * 1000, masters_degree_per_1000 = masters_degree/total_pop*1000, bachelors_degree_per_1000 = bachelors_degree/total_pop *1000, associates_degree_per_1000 = masters_degree/total_pop *1000, k1t2_students_per_1000 = k12_students/total_pop*1000, income_under_40_per_1000 = income_under_40/total_pop*1000, income_over_40_under_100_per_1000 = income_over_40_under_100/total_pop*1000, income_over_100_per_1000 = income_over_100/total_pop*1000, income_200000_or_more_per_1000 = income_200000_or_more/total_pop*1000, children_in_single_female_hh_per_1000 = children_in_single_female_hh/total_pop*1000, households_public_asst_or_food_stamps_per_1000 = households_public_asst_or_food_stamps/total_pop*1000, median_income_per_1000 = median_income/total_pop*1000, employed_pop_per_1000 = employed_pop/total_pop*1000, total_pop_per_1000 = total_pop)
+
+ 
+```
+
+
+```{r}
+counties_with_maj_black_pop <- audit_cases%>%filter(audit_cases['black_pop_per_1000'] > audit_cases['white_pop_per_1000'], audit_cases['black_pop_per_1000'] > audit_cases['hispanic_pop_per_1000'], audit_cases['black_pop_per_1000'] > audit_cases['amerindian_pop_per_1000'], audit_cases['black_pop_per_1000'] > audit_cases['asian_pop_per_1000'])
+
+counties_with_maj_hispanic_pop <- audit_cases%>%filter(audit_cases['hispanic_pop_per_1000'] > audit_cases['white_pop_per_1000'], audit_cases['hispanic_pop_per_1000'] > audit_cases['black_pop_per_1000'], audit_cases['hispanic_pop_per_1000'] > audit_cases['amerindian_pop_per_1000'], audit_cases['hispanic_pop_per_1000'] > audit_cases['asian_pop_per_1000'])
+
+counties_with_maj_white_pop <- audit_cases%>%filter(audit_cases['white_pop_per_1000'] > audit_cases['black_pop_per_1000'], audit_cases['white_pop_per_1000'] > audit_cases['hispanic_pop_per_1000'],audit_cases['white_pop_per_1000'] > audit_cases['amerindian_pop_per_1000'], audit_cases['white_pop_per_1000'] > audit_cases['asian_pop_per_1000'])
+
+counties_with_maj_amerindian_pop <- audit_cases%>%filter(audit_cases['amerindian_pop_per_1000'] > audit_cases['black_pop_per_1000'], audit_cases['amerindian_pop_per_1000'] > audit_cases['white_pop_per_1000'], audit_cases['amerindian_pop_per_1000'] > audit_cases['hispanic_pop_per_1000'], audit_cases['amerindian_pop_per_1000'] > audit_cases['asian_pop_per_1000'])
+
+counties_with_maj_asian_pop <- audit_cases%>%filter(audit_cases['asian_pop_per_1000'] > audit_cases['black_pop_per_1000'],
+audit_cases['asian_pop_per_1000'] > audit_cases['white_pop_per_1000'], audit_cases['asian_pop_per_1000'] > audit_cases['hispanic_pop_per_1000'], audit_cases['asian_pop_per_1000'] > audit_cases['amerindian_pop_per_1000'])
+
+for(i in counties_with_maj_black_pop)
+  counties_with_maj_black_pop['race'] = 1
+
+for(i in counties_with_maj_white_pop)
+  counties_with_maj_white_pop['race'] = 2
+
+for(i in counties_with_maj_hispanic_pop)
+  counties_with_maj_hispanic_pop['race'] = 3
+
+for(i in counties_with_maj_amerindian_pop)
+  counties_with_maj_amerindian_pop['race'] = 4
+
+for(i in counties_with_maj_asian_pop)
+  counties_with_maj_asian_pop['race'] = 5
+
+
+s_counties_with_maj_amerindian_pop <- counties_with_maj_amerindian_pop %>%as.data.frame() %>% arrange(desc(deaths_per_1000))
+s_counties_with_maj_amerindian_pop <- head(s_counties_with_maj_amerindian_pop, n=34) %>% arrange(desc(deaths_per_1000))
+s_counties_with_maj_amerindian_pop <- s_counties_with_maj_amerindian_pop %>% arrange(desc(deaths_per_1000))
+
+
+s_counties_with_maj_hispanic_pop <- counties_with_maj_hispanic_pop %>%as.data.frame() %>% arrange(desc(deaths_per_1000))
+s_counties_with_maj_hispanic_pop <- head(counties_with_maj_hispanic_pop, n=40) %>% arrange(desc(deaths_per_1000))
+s_counties_with_maj_hispanic_pop <- s_counties_with_maj_hispanic_pop %>% arrange(desc(deaths_per_1000))
+
+
+
+s_counties_with_maj_white_pop <- counties_with_maj_white_pop %>%as.data.frame() %>% arrange(desc(deaths_per_1000))
+s_counties_with_maj_white_pop <- head(s_counties_with_maj_white_pop, n=50) %>% arrange(desc(deaths_per_1000))
+s_counties_with_maj_white_pop <- s_counties_with_maj_white_pop %>% arrange(desc(deaths_per_1000))
+
+s_counties_with_maj_white_pop <- s_counties_with_maj_white_pop %>% filter(!county_name=="Gove County")
+
+s_counties_with_maj_black_pop <- counties_with_maj_black_pop %>%as.data.frame() %>% arrange(desc(deaths_per_1000))
+s_counties_with_maj_black_pop <- head(s_counties_with_maj_black_pop, n=15) %>% arrange(desc(deaths_per_1000))
+s_counties_with_maj_black_pop <- s_counties_with_maj_black_pop %>% arrange(desc(deaths_per_1000))
+
+```
+
+```{r}
+combined_classes_on_race <- list(counties_with_maj_amerindian_pop, s_counties_with_maj_black_pop, s_counties_with_maj_hispanic_pop, s_counties_with_maj_black_pop, s_counties_with_maj_white_pop, counties_with_maj_asian_pop)
+selected_cases_per_1000 <- Reduce(function(x, y) merge(x, y, all=TRUE), combined_classes_on_race)
+selected_cases_per_1000
+
+# combined_classes_on_race <- list(counties_with_maj_amerindian_pop, counties_with_maj_black_pop, counties_with_maj_hispanic_pop, counties_with_maj_black_pop, counties_with_maj_white_pop, counties_with_maj_asian_pop)
+# selected_cases_per_1000 <- Reduce(function(x, y) merge(x, y, all=TRUE), combined_classes_on_race) 
+# selected_cases_per_1000
+```
+
+
+
+
+
+
+
+#### Remove features not per 1000
+
+
+```{r}
+selected_cases_per_1000 = subset(selected_cases_per_1000, select = -c(children, poverty, local_commuters, commuters_in_groups, out_of_town_commuters, two_parent_families_with_young_children, unemployed_pop, some_college_and_associates_degree, pop_determined_poverty_status, not_us_citizen_pop, masters_degree, bachelors_degree, associates_degree, k12_students, income_under_40, income_over_40_under_100, income_over_100, income_200000_or_more, children_in_single_female_hh, households_public_asst_or_food_stamps, employed_pop, total_pop, median_income, confirmed_cases, deaths, black_pop, white_pop,hispanic_pop, asian_pop, amerindian_pop, not_us_citizen_pop))
+selected_cases_per_1000  
+```
+
+
+
+
+
+#### Track COVID cases based on Commuter statistics
+
+
+```{r}
+selected_cases_per_1000 = subset(selected_cases_per_1000, select = -c(children_per_1000, some_college_and_associates_degree_per_1000, masters_degree_per_1000, bachelors_degree_per_1000, associates_degree_per_1000, income_under_40_per_1000, income_over_40_under_100_per_1000, income_over_100_per_1000, income_200000_or_more_per_1000, unemployed_pop_per_1000,employed_pop_per_1000, households_public_asst_or_food_stamps_per_1000, pop_determined_poverty_status_per_1000, children_in_single_female_hh_per_1000, poverty_per_1000, two_parent_families_with_young_children_per_1000, k1t2_students_per_1000, median_income_per_1000, total_pop_per_1000, amerindian_pop_per_1000, asian_pop_per_1000, hispanic_pop_per_1000, white_pop_per_1000, black_pop_per_1000, not_us_citizen_pop_per_1000))
+
+
+```
+
+
+```{r}
+selected_cases_per_1000
+```
+
+
+
+```{r}
+selected_cases_per_1000 |>
+  group_by(race)|>
+  summarize(across(everything(),mean))
+```
+
+
+
+
+```{r}
+plotly::plot_ly(selected_cases_per_1000, x = ~deaths_per_1000, y = ~death_per_case, z = ~cases_per_1000, 
+      color = ~race, size = 1) |> 
+  plotly::add_markers()
+```
+
+
+
+
+
+```{r}
+#### Remove nominal features to not skew the data
+
+selected_cases_per_1000 = subset(selected_cases_per_1000, select = -c(state, county_name))
+# selected_cases_per_1000$county_name <- unclass(selected_cases_per_1000$county_name)
+# selected_cases_per_1000$state <- unclass(selected_cases_per_1000$state)
+```
+
+```{r}
+selected_cases_per_1000$state <- unclass(selected_cases_per_1000$state)
+
+selected_cases_per_1000[is.na(selected_cases_per_1000)] <- 0
+scale_numeric <- function(x) 
+  x |> 
+  mutate(across(where(is.numeric), ~as.vector(scale(.))))
+
+pca_cases.scaled <- selected_cases_per_1000 |> 
+  scale_numeric()
+selected_cases_per_1000 <- tibble(pca_cases.scaled)
+```
+
+
+
+
+```{r}
+selected_cases_per_1000 <- selected_cases_per_1000[ , unlist(lapply(selected_cases_per_1000, is.numeric))]
+results <- prcomp(selected_cases_per_1000, scale=TRUE)
+results$rotation
+```
+
+```{r}
+biplot(results, scale = 0)
+```
+
+
+
+
+```{r}
+results$rotation <- -1*results$rotation
+```
+
+
+```{r}
+fviz_pca_biplot(results,
+                label="var",
+                #habillage = selected_cases_per_1000$state)
+)
+```
+
+
+
+```{r}
+fviz_pca_biplot(results,
+                geom = c("point", "text"),
+                col.ind = "cos2",
+                col.var = "black",
+                gradient.cols = c("blue","green","red"))
+```
+
+
+
+
+```{r}
+library(dbscan)
+library("GGally")
+lof <- lof(selected_cases_per_1000, minPts= 10)
+lof
+```
+
+
+
+
+```{r}
+ggplot(tibble(index = seq_len(length(lof)), lof = sort(lof)), aes(index, lof)) +
+  geom_line() +
+  geom_hline(yintercept = 1, color = "red", linetype = 2) +
+  geom_hline(yintercept = 2.5, color = "blue", linetype = 2)
+```
+
+
+
+
+
+```{r}
+ggplot(selected_cases_per_1000 |> add_column(outlier = lof >= 3), aes(commuters_in_groups_per_1000, death_per_case, color = outlier)) +
+  geom_point()
+```
+
+
+
+
+
+```{r}
+selected_cases_per_1000.scaled_clean <- selected_cases_per_1000  |> filter(lof < 3)
+
+km <- kmeans(selected_cases_per_1000.scaled_clean, centers = 5, nstart = 10)
+pca_cases.scaled_clean_km <- selected_cases_per_1000.scaled_clean|>
+  add_column(cluster = factor(km$cluster))
+centroids <- as_tibble(km$centers, rownames = "cluster")
+
+ggplot(pca_cases.scaled_clean_km, aes(x = race, y = death_per_case, color = cluster)) + geom_point() +
+  geom_point(data = centroids, aes(x = race, y = death_per_case, color = cluster), shape = 3, size = 10)
+```
+
+
+```{r}
+selected_cases_per_1000.scaled_clean
+```
+
+
+```{r}
+#selected_cases_per_1000 <- selected_cases_per_1000.scaled_clean
+```
+
+
+
+
+```{r}
+summary(selected_cases_per_1000)
+```
+
+
+
+
+```{r}
+detect_outlier <- function(x) {
+
+  # calculate first quantile
+  Quantile1 <- quantile(x, probs=.25)
+
+  # calculate third quantile
+  Quantile3 <- quantile(x, probs=.75)
+
+  # calculate inter quartile range
+  IQR = Quantile3-Quantile1
+
+  # return true or false
+  x > Quantile3 + (IQR*1.5) | x < Quantile1 - (IQR*1.5)
+}
+
+# create remove outlier function
+remove_outlier <- function(dataframe,
+                            columns=names(dataframe)) {
+
+  # for loop to traverse in columns vector
+  for (col in columns) {
+
+    # remove observation if it satisfies outlier function
+    dataframe <- dataframe[!detect_outlier(dataframe[[col]]), ]
+  }
+
+  # return dataframe
+  print("Remove outliers")
+  print(dataframe)
+}
+
+audit_cases <- remove_outlier(selected_cases_per_1000, columns=names(selected_cases_per_1000))
+```
+
+
+
+```{r}
+ audit_cases$id <- rownames(audit_cases)
+  for (i in audit_cases['id'])
+    pca_cases_outliers <- selected_cases_per_1000[i,]
+  for( i in audit_cases['id'])
+    selected_cases_per_1000 <- selected_cases_per_1000 %>% filter(rownames(selected_cases_per_1000) %in% c(i))
+
+```
+
+
+```{r}
+selected_cases_per_1000 <- selected_cases_per_1000[ , unlist(lapply(selected_cases_per_1000, is.numeric))]
+pca <- prcomp(selected_cases_per_1000, 
+              scale = TRUE)
+```
+
+```{r}
+pca$rotation
+```
+
+
+```{r}
+pca$rotation <- -1*pca$rotation
+```
+
+
+```{r}
+fviz_pca_biplot(pca,
+                label="var",
+                habillage = selected_cases_per_1000$race)
+```
+
+
+```{r}
+selected_cases_per_1000 |>
+  group_by(race)|>
+  summarize(across(everything(),mean))
+```
+
+
+
+```{r}
+plotly::plot_ly(selected_cases_per_1000, x = ~deaths_per_1000, y = ~death_per_case, z = ~cases_per_1000, 
+      color = ~race, size = 1) |> 
+  plotly::add_markers()
+```
+
+
+
+
+
+```{r}
+plot(pca, type = "line")
+```
+
+
+```{r}
+pca_cases_tibble <-selected_cases_per_1000
+get_clust_tendency(pca_cases_tibble, n = 4)
+```
+
+
+
+
+```{r}
+set.seed(1234)
+ks <- 2:10
+```
+
+
+
+
+```{r}
+WCSS <- sapply(ks, FUN = function(k) {
+  kmeans(selected_cases_per_1000, centers = k, nstart = 5)$tot.withinss
+  })
+
+ggplot(tibble(ks, WCSS), aes(ks, WCSS)) + geom_line() +
+  geom_vline(xintercept = 5, color = "red", linetype = 2)
+```
+
+
+
+
+
+```{r}
+km <- kmeans(selected_cases_per_1000, centers = 9, nstart = 10)
+km
+```
+
+
+```{r}
+pca_clustered <- selected_cases_per_1000|> add_column(cluster = factor(km$cluster))
+pca_clustered
+```
+
+
+
+
+```{r}
+ggplot(pca_clustered, aes(x = death_per_case, y = cases_per_1000, colour = cluster), after_stat()) + geom_point() 
+```
+
+
+
+```{r}
+df_new <- pca_clustered[ , unlist(lapply(pca_clustered, is.numeric))]
+```
+
+
+
+
+
+```{r}
+library(factoextra)
+fviz_cluster(km, data = df_new, centroids = TRUE, repel = TRUE, ellipse.type = "norm")
+```
+
+
+
+```{r}
+d <- dist(pca_clustered)
+hc <- hclust(d, method = "complete")
+plot(hc)
+```
+
+
+```{r}
+fviz_dend(hc, k = 5)
+```
+
+
+
+
+```{r}
+clusters <- cutree(hc, k = 5)
+cluster_complete <- pca_clustered 
+cluster_complete
+
+
+
+```
+
+
+
+```{r}
+cluster_complete <- cluster_complete[ , unlist(lapply(cluster_complete, is.numeric))]
+fviz_cluster(list(data = cluster_complete, cluster = cutree(hc, k = 5)), geom = "point")
+```
+
+
+
+
+
+
+
+```{r}
+ggplot(pivot_longer(centroids, cols = c(race, death_per_case, deaths_per_1000, cases_per_1000, commuters_in_groups_per_1000, local_commuters_per_1000, out_of_town_commuters_per_1000), names_to = "feature"),
+  aes(x = value, y = feature, fill = cluster)) +
+  geom_bar(stat = "identity") +
+  facet_grid(rows = vars(cluster))
+```
+
+
+```{r}
+fpc::cluster.stats(d, km$cluster)
+```
+
+
+
+```{r}
+sapply(
+  list(
+    km = km$cluster,
+    hc_compl = cutree(hc, k = 4),
+    hc_single = cutree(hc_single, k = 4)
+  ),
+  FUN = function(x)
+    fpc::cluster.stats(d, x))[c("within.cluster.ss", "avg.silwidth"), ]
+```
+
+
+```{r}
+library(cluster)
+plot(silhouette(km$cluster, d))
+```
+
+
+```{r}
+fviz_silhouette(silhouette(km$cluster, d))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
